@@ -72,7 +72,7 @@ aws lambda update-function-code \
   --region us-east-1
 
 # 5. Test with a video
-aws s3 cp your-video.ts s3://$S3_BUCKET_NAME/04-california/amazon_transcribe/ine/raw/
+aws s3 cp your-video.ts s3://$S3_BUCKET_NAME/amazon_transcribe/ine/raw/
 ```
 
 **That's it!** Monitor progress in the [Step Functions Console](https://console.aws.amazon.com/states).
@@ -123,7 +123,7 @@ aws-transcribe/
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  S3 Bucket: s3://04-california/04-california/amazon_transcribe/  │
+│  S3 Bucket: s3://04-california/amazon_transcribe/ine/       │
 │                                                              │
 │  ├── raw/          (.ts files)                              │
 │  ├── transcoded/   (.mp4 files)                             │
@@ -207,14 +207,14 @@ $env:S3_BUCKET_NAME = "04-california"
 ### Manual Upload
 
 ```bash
-aws s3 cp video.ts s3://04-california/04-california/amazon_transcribe/ine/raw/
+aws s3 cp video.ts s3://04-california/amazon_transcribe/ine/raw/
 ```
 
 ### Download Results
 
 ```bash
 # Download all processed text files
-aws s3 sync s3://04-california/04-california/amazon_transcribe/ine/text/ ./study-materials/
+aws s3 sync s3://04-california/amazon_transcribe/ine/text/ ./study-materials/
 ```
 
 ---

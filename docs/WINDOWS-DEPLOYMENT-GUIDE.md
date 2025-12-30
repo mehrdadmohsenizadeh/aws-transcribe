@@ -10,14 +10,14 @@
 
 Here's how S3 works:
 ```
-s3://my-unique-bucket-name/04-california/amazon_transcribe/ine/raw/video.ts
+s3://my-unique-bucket-name/amazon_transcribe/ine/raw/video.ts
        ↑                    ↑
    Bucket Name         Folder Path (prefix)
 ```
 
 **You need to choose a globally unique bucket name** (examples below in Step 4).
 
-The folder structure `/04-california/amazon_transcribe/ine/` is already configured in the code—you don't need to change it.
+The folder structure `/amazon_transcribe/ine/` is already configured in the code—you don't need to change it.
 
 ---
 
@@ -450,13 +450,13 @@ For this guide, I'll use the example: `04-california`
 
    **Upload the file**:
    ```cmd
-   aws s3 cp "C:\Users\%USERNAME%\Downloads\transcripts\test-video.ts" s3://%S3_BUCKET_NAME%/04-california/amazon_transcribe/ine/raw/test-video.ts --region us-east-1
+   aws s3 cp "C:\Users\%USERNAME%\Downloads\transcripts\test-video.ts" s3://%S3_BUCKET_NAME%/amazon_transcribe/ine/raw/test-video.ts --region us-east-1
    ```
    ↑ Replace `test-video.ts` with your actual filename!
 
 4. **Expected Output**:
    ```
-   upload: transcripts\test-video.ts to s3://04-california/04-california/amazon_transcribe/ine/raw/test-video.ts
+   upload: transcripts\test-video.ts to s3://04-california/amazon_transcribe/ine/raw/test-video.ts
    ```
 
 **Option 2: Using PowerShell Sync Script**
@@ -550,7 +550,7 @@ aws stepfunctions list-executions --state-machine-arn arn:aws:states:us-east-1:Y
 
 1. **List Files in S3**
    ```cmd
-   aws s3 ls s3://%S3_BUCKET_NAME%/04-california/amazon_transcribe/ine/text/ --region us-east-1
+   aws s3 ls s3://%S3_BUCKET_NAME%/amazon_transcribe/ine/text/ --region us-east-1
    ```
 
    Should show:
@@ -560,7 +560,7 @@ aws stepfunctions list-executions --state-machine-arn arn:aws:states:us-east-1:Y
 
 2. **Download the Text File**
    ```cmd
-   aws s3 cp s3://%S3_BUCKET_NAME%/04-california/amazon_transcribe/ine/text/test-video.txt "C:\Users\%USERNAME%\Downloads\test-video.txt" --region us-east-1
+   aws s3 cp s3://%S3_BUCKET_NAME%/amazon_transcribe/ine/text/test-video.txt "C:\Users\%USERNAME%\Downloads\test-video.txt" --region us-east-1
    ```
 
 3. **Open and Read**

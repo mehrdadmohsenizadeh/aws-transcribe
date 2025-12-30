@@ -54,7 +54,7 @@
               "OutputGroupSettings": {
                 "Type": "FILE_GROUP_SETTINGS",
                 "FileGroupSettings": {
-                  "Destination.$": "States.Format('s3://{}/04-california/amazon_transcribe/ine/transcoded/', $.bucket)"
+                  "Destination.$": "States.Format('s3://{}/amazon_transcribe/ine/transcoded/', $.bucket)"
                 }
               },
               "Outputs": [
@@ -120,7 +120,7 @@
       "Parameters": {
         "bucket.$": "$.bucket",
         "baseFilename.$": "$.baseFilename",
-        "mp4Key.$": "States.Format('04-california/amazon_transcribe/ine/transcoded/{}.mp4', $.baseFilename)",
+        "mp4Key.$": "States.Format('amazon_transcribe/ine/transcoded/{}.mp4', $.baseFilename)",
         "executionId.$": "$.executionId"
       },
       "Next": "StartTranscribeJob"
@@ -135,7 +135,7 @@
           "MediaFileUri.$": "States.Format('s3://{}/{}', $.bucket, $.mp4Key)"
         },
         "OutputBucketName.$": "$.bucket",
-        "OutputKey.$": "States.Format('04-california/amazon_transcribe/ine/transcripts/{}', $.baseFilename)",
+        "OutputKey.$": "States.Format('amazon_transcribe/ine/transcripts/{}', $.baseFilename)",
         "LanguageCode": "en-US",
         "Subtitles": {
           "Formats": [
@@ -209,7 +209,7 @@
         "FunctionName": "${TextProcessorLambda}",
         "Payload": {
           "bucket.$": "$.bucket",
-          "srtKey.$": "States.Format('04-california/amazon_transcribe/ine/transcripts/{}.srt', $.baseFilename)",
+          "srtKey.$": "States.Format('amazon_transcribe/ine/transcripts/{}.srt', $.baseFilename)",
           "baseFilename.$": "$.baseFilename"
         }
       },

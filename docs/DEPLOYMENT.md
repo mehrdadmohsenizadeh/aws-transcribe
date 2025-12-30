@@ -169,17 +169,17 @@ You should see:
 # Download a sample .ts video (or use your own)
 # Upload to S3
 aws s3 cp test-video.ts \
-  s3://$S3_BUCKET_NAME/04-california/amazon_transcribe/ine/raw/test-video.ts \
+  s3://$S3_BUCKET_NAME/amazon_transcribe/ine/raw/test-video.ts \
   --region us-east-1
 
 # Verify upload
-aws s3 ls s3://$S3_BUCKET_NAME/04-california/amazon_transcribe/ine/raw/
+aws s3 ls s3://$S3_BUCKET_NAME/amazon_transcribe/ine/raw/
 ```
 
 **Option B: Upload via AWS Console**
 1. Go to S3 Console: https://s3.console.aws.amazon.com
 2. Click your bucket name
-3. Navigate to `04-california/amazon_transcribe/ine/raw/`
+3. Navigate to `amazon_transcribe/ine/raw/`
 4. Click **Upload** → Add `.ts` file → Upload
 
 ### Step 8: Monitor Workflow Execution
@@ -220,7 +220,7 @@ aws stepfunctions describe-execution \
 
 ```bash
 # Check all output files
-aws s3 ls s3://$S3_BUCKET_NAME/04-california/amazon_transcribe/ine/ --recursive
+aws s3 ls s3://$S3_BUCKET_NAME/amazon_transcribe/ine/ --recursive
 
 # Expected structure:
 # raw/test-video.ts           (original)
@@ -230,7 +230,7 @@ aws s3 ls s3://$S3_BUCKET_NAME/04-california/amazon_transcribe/ine/ --recursive
 # text/test-video.txt         (clean text)
 
 # Download the final text file
-aws s3 cp s3://$S3_BUCKET_NAME/04-california/amazon_transcribe/ine/text/test-video.txt .
+aws s3 cp s3://$S3_BUCKET_NAME/amazon_transcribe/ine/text/test-video.txt .
 
 # View content
 cat test-video.txt
