@@ -1,0 +1,546 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Video Transcription Pipeline - Production Grade Infrastructure'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: 'video-transcription'
+    Description: 'Project name for resource naming'
+
+  S3BucketName:
+    Type: String
+    Description: 'S3 bucket name for video storage (must be globally unique)'
+    AllowedPattern: '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
+    ConstraintDescription: 'Bucket name must be lowercase, alphanumeric with hyphens'
+
+  NotificationEmail:
+    Type: String
+    Description: 'Email address for pipeline notifications'
+    AllowedPattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+
+Resources:
+  # ============================================================================
+  # S3 BUCKET
+  # ============================================================================
+  TranscriptionBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref S3BucketName
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldRawFiles
+            Status: Enabled
+            Prefix: '04-california/aws_transcribe/ine/raw/'
+            ExpirationInDays: 30
+            NoncurrentVersionExpirationInDays: 7
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ============================================================================
+  # SNS TOPIC FOR NOTIFICATIONS
+  # ============================================================================
+  PipelineNotificationTopic:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      TopicName: !Sub '${ProjectName}-notifications'
+      DisplayName: 'Video Transcription Pipeline Notifications'
+      Subscription:
+        - Endpoint: !Ref NotificationEmail
+          Protocol: email
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # ============================================================================
+  # IAM ROLE: MediaConvert
+  # ============================================================================
+  MediaConvertRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${ProjectName}-mediaconvert-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: mediaconvert.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+      Policies:
+        - PolicyName: MediaConvertS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - !Sub '${TranscriptionBucket.Arn}/*'
+                  - !GetAtt TranscriptionBucket.Arn
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub '${TranscriptionBucket.Arn}/04-california/aws_transcribe/ine/transcoded/*'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # ============================================================================
+  # IAM ROLE: Lambda Text Processor
+  # ============================================================================
+  TextProcessorLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${ProjectName}-lambda-text-processor'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                Resource:
+                  - !Sub '${TranscriptionBucket.Arn}/04-california/aws_transcribe/ine/transcripts/*'
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub '${TranscriptionBucket.Arn}/04-california/aws_transcribe/ine/text/*'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # ============================================================================
+  # LAMBDA FUNCTION: Text Processor
+  # ============================================================================
+  TextProcessorLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: !Sub '${ProjectName}-text-processor'
+      Runtime: python3.11
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt TextProcessorLambdaRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Code:
+        ZipFile: |
+          # Placeholder - deploy actual code using 'aws lambda update-function-code'
+          # See deployment instructions in docs/DEPLOYMENT.md
+          def lambda_handler(event, context):
+              return {'statusCode': 500, 'message': 'Deploy actual Lambda code'}
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # ============================================================================
+  # IAM ROLE: Step Functions
+  # ============================================================================
+  StepFunctionsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${ProjectName}-stepfunctions-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: StepFunctionsExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # MediaConvert permissions
+              - Effect: Allow
+                Action:
+                  - 'mediaconvert:CreateJob'
+                  - 'mediaconvert:GetJob'
+                  - 'mediaconvert:ListJobs'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: !GetAtt MediaConvertRole.Arn
+                Condition:
+                  StringEquals:
+                    'iam:PassedToService': 'mediaconvert.amazonaws.com'
+
+              # Transcribe permissions
+              - Effect: Allow
+                Action:
+                  - 'transcribe:StartTranscriptionJob'
+                  - 'transcribe:GetTranscriptionJob'
+                  - 'transcribe:DeleteTranscriptionJob'
+                Resource: '*'
+
+              # Lambda permissions
+              - Effect: Allow
+                Action:
+                  - 'lambda:InvokeFunction'
+                Resource: !GetAtt TextProcessorLambda.Arn
+
+              # S3 permissions (for Transcribe output)
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub '${TranscriptionBucket.Arn}/04-california/aws_transcribe/ine/transcripts/*'
+
+              # SNS permissions (for notifications)
+              - Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                Resource: !Ref PipelineNotificationTopic
+
+              # X-Ray (optional, for tracing)
+              - Effect: Allow
+                Action:
+                  - 'xray:PutTraceSegments'
+                  - 'xray:PutTelemetryRecords'
+                Resource: '*'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # ============================================================================
+  # STEP FUNCTIONS STATE MACHINE
+  # ============================================================================
+  TranscriptionStateMachine:
+    Type: 'AWS::StepFunctions::StateMachine'
+    Properties:
+      StateMachineName: !Sub '${ProjectName}-workflow'
+      RoleArn: !GetAtt StepFunctionsRole.Arn
+      TracingConfiguration:
+        Enabled: true
+      DefinitionString: !Sub
+        - |
+          {
+            "Comment": "Video Transcription Pipeline - Production Grade",
+            "StartAt": "ParseS3Event",
+            "States": {
+              "ParseS3Event": {
+                "Type": "Pass",
+                "Parameters": {
+                  "bucket.$": "$.detail.bucket.name",
+                  "key.$": "$.detail.object.key",
+                  "baseFilename.$": "States.ArrayGetItem(States.StringSplit(States.ArrayGetItem(States.StringSplit($.detail.object.key, '/'), States.MathAdd(States.ArrayLength(States.StringSplit($.detail.object.key, '/')), -1)), '.'), 0)",
+                  "executionId.$": "$$.Execution.Name"
+                },
+                "Next": "ValidateInputFile"
+              },
+              "ValidateInputFile": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.key",
+                    "StringMatches": "*/raw/*.ts",
+                    "Next": "StartMediaConvertJob"
+                  }
+                ],
+                "Default": "InvalidFileType"
+              },
+              "InvalidFileType": {
+                "Type": "Fail",
+                "Error": "InvalidFileType",
+                "Cause": "File must be a .ts video in the raw/ folder"
+              },
+              "StartMediaConvertJob": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::mediaconvert:createJob.sync",
+                "Parameters": {
+                  "Role": "${MediaConvertRoleArn}",
+                  "Settings": {
+                    "Inputs": [
+                      {
+                        "FileInput.$": "States.Format('s3://{}/{}', $.bucket, $.key)",
+                        "AudioSelectors": {
+                          "Audio Selector 1": {
+                            "DefaultSelection": "DEFAULT"
+                          }
+                        }
+                      }
+                    ],
+                    "OutputGroups": [
+                      {
+                        "Name": "MP4",
+                        "OutputGroupSettings": {
+                          "Type": "FILE_GROUP_SETTINGS",
+                          "FileGroupSettings": {
+                            "Destination.$": "States.Format('s3://{}/04-california/aws_transcribe/ine/transcoded/', $.bucket)"
+                          }
+                        },
+                        "Outputs": [
+                          {
+                            "ContainerSettings": {
+                              "Container": "MP4"
+                            },
+                            "VideoDescription": {
+                              "CodecSettings": {
+                                "Codec": "H_264",
+                                "H264Settings": {
+                                  "RateControlMode": "QVBR",
+                                  "MaxBitrate": 5000000
+                                }
+                              }
+                            },
+                            "AudioDescriptions": [
+                              {
+                                "CodecSettings": {
+                                  "Codec": "AAC",
+                                  "AacSettings": {
+                                    "Bitrate": 128000
+                                  }
+                                }
+                              }
+                            ],
+                            "NameModifier.$": "$.baseFilename"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "ResultPath": "$.mediaConvertResult",
+                "Next": "BuildMP4Path",
+                "Retry": [
+                  {
+                    "ErrorEquals": ["States.TaskFailed"],
+                    "IntervalSeconds": 30,
+                    "MaxAttempts": 2,
+                    "BackoffRate": 2.0
+                  }
+                ]
+              },
+              "BuildMP4Path": {
+                "Type": "Pass",
+                "Parameters": {
+                  "bucket.$": "$.bucket",
+                  "baseFilename.$": "$.baseFilename",
+                  "mp4Key.$": "States.Format('04-california/aws_transcribe/ine/transcoded/{}.mp4', $.baseFilename)",
+                  "executionId.$": "$.executionId"
+                },
+                "Next": "StartTranscribeJob"
+              },
+              "StartTranscribeJob": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::aws-sdk:transcribe:startTranscriptionJob",
+                "Parameters": {
+                  "TranscriptionJobName.$": "States.Format('transcribe-{}-{}', $.baseFilename, $.executionId)",
+                  "Media": {
+                    "MediaFileUri.$": "States.Format('s3://{}/{}', $.bucket, $.mp4Key)"
+                  },
+                  "OutputBucketName.$": "$.bucket",
+                  "OutputKey.$": "States.Format('04-california/aws_transcribe/ine/transcripts/{}', $.baseFilename)",
+                  "LanguageCode": "en-US",
+                  "Subtitles": {
+                    "Formats": ["srt", "vtt"],
+                    "OutputStartIndex": 1
+                  }
+                },
+                "ResultPath": "$.transcribeSubmit",
+                "Next": "WaitForTranscribe"
+              },
+              "WaitForTranscribe": {
+                "Type": "Wait",
+                "Seconds": 30,
+                "Next": "CheckTranscribeStatus"
+              },
+              "CheckTranscribeStatus": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::aws-sdk:transcribe:getTranscriptionJob",
+                "Parameters": {
+                  "TranscriptionJobName.$": "$.transcribeSubmit.TranscriptionJob.TranscriptionJobName"
+                },
+                "ResultPath": "$.transcribeStatus",
+                "Next": "IsTranscribeComplete"
+              },
+              "IsTranscribeComplete": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.transcribeStatus.TranscriptionJob.TranscriptionJobStatus",
+                    "StringEquals": "COMPLETED",
+                    "Next": "ProcessTranscriptToText"
+                  },
+                  {
+                    "Variable": "$.transcribeStatus.TranscriptionJob.TranscriptionJobStatus",
+                    "StringEquals": "FAILED",
+                    "Next": "TranscribeFailed"
+                  }
+                ],
+                "Default": "WaitForTranscribe"
+              },
+              "ProcessTranscriptToText": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Parameters": {
+                  "FunctionName": "${TextProcessorLambdaArn}",
+                  "Payload": {
+                    "bucket.$": "$.bucket",
+                    "srtKey.$": "States.Format('04-california/aws_transcribe/ine/transcripts/{}.srt', $.baseFilename)",
+                    "baseFilename.$": "$.baseFilename"
+                  }
+                },
+                "ResultPath": "$.textProcessingResult",
+                "Next": "WorkflowSuccess"
+              },
+              "WorkflowSuccess": {
+                "Type": "Succeed"
+              },
+              "TranscribeFailed": {
+                "Type": "Fail",
+                "Error": "TranscribeJobFailed"
+              }
+            }
+          }
+        - MediaConvertRoleArn: !GetAtt MediaConvertRole.Arn
+          TextProcessorLambdaArn: !GetAtt TextProcessorLambda.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # ============================================================================
+  # EVENTBRIDGE RULE: Trigger Step Functions on S3 upload
+  # ============================================================================
+  S3UploadTriggerRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: !Sub '${ProjectName}-s3-upload-trigger'
+      Description: 'Trigger transcription workflow when .ts file uploaded to raw/'
+      State: ENABLED
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref TranscriptionBucket
+          object:
+            key:
+              - prefix: '04-california/aws_transcribe/ine/raw/'
+              - suffix: '.ts'
+      Targets:
+        - Arn: !GetAtt TranscriptionStateMachine.Arn
+          RoleArn: !GetAtt EventBridgeInvokeStepFunctionsRole.Arn
+          Id: TriggerStepFunctions
+
+  # ============================================================================
+  # IAM ROLE: EventBridge to invoke Step Functions
+  # ============================================================================
+  EventBridgeInvokeStepFunctionsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${ProjectName}-eventbridge-invoke-sfn'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: InvokeStepFunctions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'states:StartExecution'
+                Resource: !GetAtt TranscriptionStateMachine.Arn
+
+  # ============================================================================
+  # CLOUDWATCH ALARM: Step Functions failures
+  # ============================================================================
+  StepFunctionsFailureAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: !Sub '${ProjectName}-workflow-failures'
+      AlarmDescription: 'Alert on Step Functions execution failures'
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref TranscriptionStateMachine
+      AlarmActions:
+        - !Ref PipelineNotificationTopic
+      TreatMissingData: notBreaching
+
+# ============================================================================
+# OUTPUTS
+# ============================================================================
+Outputs:
+  S3BucketName:
+    Description: 'S3 Bucket for video storage'
+    Value: !Ref TranscriptionBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
+
+  UploadCommand:
+    Description: 'AWS CLI command to upload .ts files'
+    Value: !Sub 'aws s3 sync /local/folder s3://${TranscriptionBucket}/04-california/aws_transcribe/ine/raw/ --exclude "*" --include "*.ts"'
+
+  StateMachineArn:
+    Description: 'Step Functions State Machine ARN'
+    Value: !Ref TranscriptionStateMachine
+    Export:
+      Name: !Sub '${AWS::StackName}-StateMachineArn'
+
+  TextProcessorLambdaArn:
+    Description: 'Text Processor Lambda ARN'
+    Value: !GetAtt TextProcessorLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-TextProcessorLambda'
+
+  NotificationTopicArn:
+    Description: 'SNS Topic for notifications'
+    Value: !Ref PipelineNotificationTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-NotificationTopic'
+
+  ConsoleLinks:
+    Description: 'AWS Console quick links'
+    Value: !Sub |
+      S3 Bucket: https://s3.console.aws.amazon.com/s3/buckets/${TranscriptionBucket}
+      Step Functions: https://${AWS::Region}.console.aws.amazon.com/states/home?region=${AWS::Region}#/statemachines/view/${TranscriptionStateMachine}
+      Lambda: https://${AWS::Region}.console.aws.amazon.com/lambda/home?region=${AWS::Region}#/functions/${TextProcessorLambda}

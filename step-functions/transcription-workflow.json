@@ -1,0 +1,258 @@
+{
+  "Comment": "Video Transcription Pipeline - Production Grade",
+  "StartAt": "ParseS3Event",
+  "States": {
+    "ParseS3Event": {
+      "Type": "Pass",
+      "Comment": "Extract S3 bucket and key from EventBridge event",
+      "Parameters": {
+        "bucket.$": "$.detail.bucket.name",
+        "key.$": "$.detail.object.key",
+        "baseFilename.$": "States.ArrayGetItem(States.StringSplit(States.ArrayGetItem(States.StringSplit($.detail.object.key, '/'), States.MathAdd(States.ArrayLength(States.StringSplit($.detail.object.key, '/')), -1)), '.'), 0)",
+        "executionId.$": "$$.Execution.Name"
+      },
+      "Next": "ValidateInputFile"
+    },
+    "ValidateInputFile": {
+      "Type": "Choice",
+      "Comment": "Ensure file is a .ts video file",
+      "Choices": [
+        {
+          "Variable": "$.key",
+          "StringMatches": "*/raw/*.ts",
+          "Next": "StartMediaConvertJob"
+        }
+      ],
+      "Default": "InvalidFileType"
+    },
+    "InvalidFileType": {
+      "Type": "Fail",
+      "Error": "InvalidFileType",
+      "Cause": "File must be a .ts video in the raw/ folder"
+    },
+    "StartMediaConvertJob": {
+      "Type": "Task",
+      "Comment": "Transcode .ts to .mp4 using MediaConvert",
+      "Resource": "arn:aws:states:::mediaconvert:createJob.sync",
+      "Parameters": {
+        "Role": "${MediaConvertRole}",
+        "Settings": {
+          "Inputs": [
+            {
+              "FileInput.$": "States.Format('s3://{}/{}', $.bucket, $.key)",
+              "AudioSelectors": {
+                "Audio Selector 1": {
+                  "DefaultSelection": "DEFAULT"
+                }
+              },
+              "VideoSelector": {}
+            }
+          ],
+          "OutputGroups": [
+            {
+              "Name": "File Group",
+              "OutputGroupSettings": {
+                "Type": "FILE_GROUP_SETTINGS",
+                "FileGroupSettings": {
+                  "Destination.$": "States.Format('s3://{}/04-california/aws_transcribe/ine/transcoded/', $.bucket)"
+                }
+              },
+              "Outputs": [
+                {
+                  "ContainerSettings": {
+                    "Container": "MP4",
+                    "Mp4Settings": {}
+                  },
+                  "VideoDescription": {
+                    "CodecSettings": {
+                      "Codec": "H_264",
+                      "H264Settings": {
+                        "RateControlMode": "QVBR",
+                        "QualityTuningLevel": "SINGLE_PASS",
+                        "MaxBitrate": 5000000
+                      }
+                    }
+                  },
+                  "AudioDescriptions": [
+                    {
+                      "CodecSettings": {
+                        "Codec": "AAC",
+                        "AacSettings": {
+                          "Bitrate": 128000,
+                          "CodingMode": "CODING_MODE_2_0",
+                          "SampleRate": 48000
+                        }
+                      }
+                    }
+                  ],
+                  "NameModifier.$": "States.Format('{}', $.baseFilename)"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "ResultPath": "$.mediaConvertResult",
+      "Next": "ExtractTranscodedFile",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "MediaConvertFailed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "ExtractTranscodedFile": {
+      "Type": "Pass",
+      "Comment": "Build the .mp4 S3 path from MediaConvert output",
+      "Parameters": {
+        "bucket.$": "$.bucket",
+        "baseFilename.$": "$.baseFilename",
+        "mp4Key.$": "States.Format('04-california/aws_transcribe/ine/transcoded/{}.mp4', $.baseFilename)",
+        "executionId.$": "$.executionId"
+      },
+      "Next": "StartTranscribeJob"
+    },
+    "StartTranscribeJob": {
+      "Type": "Task",
+      "Comment": "Transcribe .mp4 to .srt and .vtt",
+      "Resource": "arn:aws:states:::aws-sdk:transcribe:startTranscriptionJob",
+      "Parameters": {
+        "TranscriptionJobName.$": "States.Format('transcribe-{}-{}', $.baseFilename, $.executionId)",
+        "Media": {
+          "MediaFileUri.$": "States.Format('s3://{}/{}', $.bucket, $.mp4Key)"
+        },
+        "OutputBucketName.$": "$.bucket",
+        "OutputKey.$": "States.Format('04-california/aws_transcribe/ine/transcripts/{}', $.baseFilename)",
+        "LanguageCode": "en-US",
+        "Subtitles": {
+          "Formats": [
+            "srt",
+            "vtt"
+          ],
+          "OutputStartIndex": 1
+        },
+        "Settings": {
+          "ShowSpeakerLabels": false,
+          "MaxSpeakerLabels": 2
+        }
+      },
+      "ResultPath": "$.transcribeSubmit",
+      "Next": "WaitForTranscribe",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "TranscribeFailed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "WaitForTranscribe": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "CheckTranscribeStatus"
+    },
+    "CheckTranscribeStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:transcribe:getTranscriptionJob",
+      "Parameters": {
+        "TranscriptionJobName.$": "$.transcribeSubmit.TranscriptionJob.TranscriptionJobName"
+      },
+      "ResultPath": "$.transcribeStatus",
+      "Next": "IsTranscribeComplete"
+    },
+    "IsTranscribeComplete": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.transcribeStatus.TranscriptionJob.TranscriptionJobStatus",
+          "StringEquals": "COMPLETED",
+          "Next": "ProcessTranscriptToText"
+        },
+        {
+          "Variable": "$.transcribeStatus.TranscriptionJob.TranscriptionJobStatus",
+          "StringEquals": "FAILED",
+          "Next": "TranscribeFailed"
+        }
+      ],
+      "Default": "WaitForTranscribe"
+    },
+    "ProcessTranscriptToText": {
+      "Type": "Task",
+      "Comment": "Lambda: Strip .srt metadata and create clean .txt",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${TextProcessorLambda}",
+        "Payload": {
+          "bucket.$": "$.bucket",
+          "srtKey.$": "States.Format('04-california/aws_transcribe/ine/transcripts/{}.srt', $.baseFilename)",
+          "baseFilename.$": "$.baseFilename"
+        }
+      },
+      "ResultPath": "$.textProcessingResult",
+      "Next": "WorkflowSuccess",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 1.5
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "TextProcessingFailed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "WorkflowSuccess": {
+      "Type": "Succeed",
+      "Comment": "Pipeline completed successfully"
+    },
+    "MediaConvertFailed": {
+      "Type": "Fail",
+      "Error": "MediaConvertJobFailed",
+      "Cause": "Video transcoding failed"
+    },
+    "TranscribeFailed": {
+      "Type": "Fail",
+      "Error": "TranscribeJobFailed",
+      "Cause": "Audio transcription failed"
+    },
+    "TextProcessingFailed": {
+      "Type": "Fail",
+      "Error": "TextProcessingFailed",
+      "Cause": "SRT to TXT conversion failed"
+    }
+  }
+}
