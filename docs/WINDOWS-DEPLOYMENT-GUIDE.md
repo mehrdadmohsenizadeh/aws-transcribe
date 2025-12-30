@@ -10,14 +10,14 @@
 
 Here's how S3 works:
 ```
-s3://my-unique-bucket-name/04-california/aws_transcribe/ine/raw/video.ts
+s3://my-unique-bucket-name/amazon_transcribe/ine/raw/video.ts
        ↑                    ↑
    Bucket Name         Folder Path (prefix)
 ```
 
 **You need to choose a globally unique bucket name** (examples below in Step 4).
 
-The folder structure `/04-california/aws_transcribe/ine/` is already configured in the code—you don't need to change it.
+The folder structure `/amazon_transcribe/ine/` is already configured in the code—you don't need to change it.
 
 ---
 
@@ -203,7 +203,7 @@ video transcribe       ❌ (space)
 My bucket name: ___________________________________
 ```
 
-For this guide, I'll use the example: `video-transcribe-california-2025`
+For this guide, I'll use the example: `04-california`
 
 **Replace this with YOUR bucket name in all commands below.**
 
@@ -263,7 +263,7 @@ For this guide, I'll use the example: `video-transcribe-california-2025`
    **REPLACE THESE VALUES WITH YOUR OWN:**
 
    ```cmd
-   set S3_BUCKET_NAME=video-transcribe-california-2025
+   set S3_BUCKET_NAME=04-california
    ```
    ↑ Replace with YOUR unique bucket name from Step 5
 
@@ -402,12 +402,12 @@ For this guide, I'll use the example: `video-transcribe-california-2025`
    ```cmd
    @echo off
    set LOCAL_VIDEO_FOLDER=C:\Users\%USERNAME%\Downloads\transcripts
-   set S3_BUCKET_NAME=video-transcribe-california-2025
+   set S3_BUCKET_NAME=04-california
    set AWS_REGION=us-east-1
    set AWS_PROFILE=default
    ```
 
-   **IMPORTANT**: Replace `video-transcribe-california-2025` with YOUR bucket name!
+   **IMPORTANT**: Replace `04-california` with YOUR bucket name!
 
 3. **Save the File**
    - Click "File" → "Save As"
@@ -444,19 +444,19 @@ For this guide, I'll use the example: `video-transcribe-california-2025`
 
    **First, set your bucket name again** (if you closed the window):
    ```cmd
-   set S3_BUCKET_NAME=video-transcribe-california-2025
+   set S3_BUCKET_NAME=04-california
    ```
    ↑ Replace with YOUR bucket name!
 
    **Upload the file**:
    ```cmd
-   aws s3 cp "C:\Users\%USERNAME%\Downloads\transcripts\test-video.ts" s3://%S3_BUCKET_NAME%/04-california/aws_transcribe/ine/raw/test-video.ts --region us-east-1
+   aws s3 cp "C:\Users\%USERNAME%\Downloads\transcripts\test-video.ts" s3://%S3_BUCKET_NAME%/amazon_transcribe/ine/raw/test-video.ts --region us-east-1
    ```
    ↑ Replace `test-video.ts` with your actual filename!
 
 4. **Expected Output**:
    ```
-   upload: transcripts\test-video.ts to s3://video-transcribe-california-2025/04-california/aws_transcribe/ine/raw/test-video.ts
+   upload: transcripts\test-video.ts to s3://04-california/amazon_transcribe/ine/raw/test-video.ts
    ```
 
 **Option 2: Using PowerShell Sync Script**
@@ -475,7 +475,7 @@ For this guide, I'll use the example: `video-transcribe-california-2025`
 3. **Set Variables**
    ```powershell
    $env:LOCAL_VIDEO_FOLDER = "C:\Users\$env:USERNAME\Downloads\transcripts"
-   $env:S3_BUCKET_NAME = "video-transcribe-california-2025"
+   $env:S3_BUCKET_NAME = "04-california"
    ```
    ↑ Replace with YOUR bucket name!
 
@@ -550,7 +550,7 @@ aws stepfunctions list-executions --state-machine-arn arn:aws:states:us-east-1:Y
 
 1. **List Files in S3**
    ```cmd
-   aws s3 ls s3://%S3_BUCKET_NAME%/04-california/aws_transcribe/ine/text/ --region us-east-1
+   aws s3 ls s3://%S3_BUCKET_NAME%/amazon_transcribe/ine/text/ --region us-east-1
    ```
 
    Should show:
@@ -560,7 +560,7 @@ aws stepfunctions list-executions --state-machine-arn arn:aws:states:us-east-1:Y
 
 2. **Download the Text File**
    ```cmd
-   aws s3 cp s3://%S3_BUCKET_NAME%/04-california/aws_transcribe/ine/text/test-video.txt "C:\Users\%USERNAME%\Downloads\test-video.txt" --region us-east-1
+   aws s3 cp s3://%S3_BUCKET_NAME%/amazon_transcribe/ine/text/test-video.txt "C:\Users\%USERNAME%\Downloads\test-video.txt" --region us-east-1
    ```
 
 3. **Open and Read**
@@ -586,7 +586,7 @@ aws stepfunctions list-executions --state-machine-arn arn:aws:states:us-east-1:Y
    ```powershell
    cd C:\Users\$env:USERNAME\Downloads\aws-transcribe\scripts\windows
    $env:LOCAL_VIDEO_FOLDER = "C:\Users\$env:USERNAME\Downloads\transcripts"
-   $env:S3_BUCKET_NAME = "video-transcribe-california-2025"
+   $env:S3_BUCKET_NAME = "04-california"
    .\sync-videos.ps1
    ```
 3. Leave the window open—it syncs every 60 seconds

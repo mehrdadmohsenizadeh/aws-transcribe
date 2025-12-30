@@ -9,21 +9,32 @@ Parameters:
 
   S3BucketName:
     Type: String
-    Description: 'S3 bucket name for video storage (must be globally unique)'
-    AllowedPattern: '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
-    ConstraintDescription: 'Bucket name must be lowercase, alphanumeric with hyphens'
+    Default: '04-california'
+    Description: 'S3 bucket name for video storage (use existing bucket: 04-california)'
+
+  CreateNewBucket:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: 'Set to true to create new bucket, false to use existing bucket 04-california'
 
   NotificationEmail:
     Type: String
     Description: 'Email address for pipeline notifications'
     AllowedPattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 
+Conditions:
+  ShouldCreateBucket: !Equals [!Ref CreateNewBucket, 'true']
+
 Resources:
   # ============================================================================
-  # S3 BUCKET
+  # S3 BUCKET (Optional - only created if CreateNewBucket=true)
   # ============================================================================
   TranscriptionBucket:
     Type: 'AWS::S3::Bucket'
+    Condition: ShouldCreateBucket
     Properties:
       BucketName: !Ref S3BucketName
       VersioningConfiguration:
@@ -44,7 +55,7 @@ Resources:
         Rules:
           - Id: DeleteOldRawFiles
             Status: Enabled
-            Prefix: '04-california/aws_transcribe/ine/raw/'
+            Prefix: 'amazon_transcribe/ine/raw/'
             ExpirationInDays: 30
             NoncurrentVersionExpirationInDays: 7
       Tags:
@@ -94,13 +105,13 @@ Resources:
                   - 's3:GetObject'
                   - 's3:ListBucket'
                 Resource:
-                  - !Sub '${TranscriptionBucket.Arn}/*'
-                  - !GetAtt TranscriptionBucket.Arn
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}'
               - Effect: Allow
                 Action:
                   - 's3:PutObject'
                 Resource:
-                  - !Sub '${TranscriptionBucket.Arn}/04-california/aws_transcribe/ine/transcoded/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/amazon_transcribe/ine/transcoded/*'
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -130,12 +141,12 @@ Resources:
                 Action:
                   - 's3:GetObject'
                 Resource:
-                  - !Sub '${TranscriptionBucket.Arn}/04-california/aws_transcribe/ine/transcripts/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/amazon_transcribe/ine/transcripts/*'
               - Effect: Allow
                 Action:
                   - 's3:PutObject'
                 Resource:
-                  - !Sub '${TranscriptionBucket.Arn}/04-california/aws_transcribe/ine/text/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/amazon_transcribe/ine/text/*'
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -218,7 +229,7 @@ Resources:
                 Action:
                   - 's3:PutObject'
                 Resource:
-                  - !Sub '${TranscriptionBucket.Arn}/04-california/aws_transcribe/ine/transcripts/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/amazon_transcribe/ine/transcripts/*'
 
               # SNS permissions (for notifications)
               - Effect: Allow
@@ -300,7 +311,7 @@ Resources:
                         "OutputGroupSettings": {
                           "Type": "FILE_GROUP_SETTINGS",
                           "FileGroupSettings": {
-                            "Destination.$": "States.Format('s3://{}/04-california/aws_transcribe/ine/transcoded/', $.bucket)"
+                            "Destination.$": "States.Format('s3://{}/amazon_transcribe/ine/transcoded/', $.bucket)"
                           }
                         },
                         "Outputs": [
@@ -350,7 +361,7 @@ Resources:
                 "Parameters": {
                   "bucket.$": "$.bucket",
                   "baseFilename.$": "$.baseFilename",
-                  "mp4Key.$": "States.Format('04-california/aws_transcribe/ine/transcoded/{}.mp4', $.baseFilename)",
+                  "mp4Key.$": "States.Format('amazon_transcribe/ine/transcoded/{}.mp4', $.baseFilename)",
                   "executionId.$": "$.executionId"
                 },
                 "Next": "StartTranscribeJob"
@@ -364,7 +375,7 @@ Resources:
                     "MediaFileUri.$": "States.Format('s3://{}/{}', $.bucket, $.mp4Key)"
                   },
                   "OutputBucketName.$": "$.bucket",
-                  "OutputKey.$": "States.Format('04-california/aws_transcribe/ine/transcripts/{}', $.baseFilename)",
+                  "OutputKey.$": "States.Format('amazon_transcribe/ine/transcripts/{}', $.baseFilename)",
                   "LanguageCode": "en-US",
                   "Subtitles": {
                     "Formats": ["srt", "vtt"],
@@ -411,7 +422,7 @@ Resources:
                   "FunctionName": "${TextProcessorLambdaArn}",
                   "Payload": {
                     "bucket.$": "$.bucket",
-                    "srtKey.$": "States.Format('04-california/aws_transcribe/ine/transcripts/{}.srt', $.baseFilename)",
+                    "srtKey.$": "States.Format('amazon_transcribe/ine/transcripts/{}.srt', $.baseFilename)",
                     "baseFilename.$": "$.baseFilename"
                   }
                 },
@@ -450,10 +461,10 @@ Resources:
         detail:
           bucket:
             name:
-              - !Ref TranscriptionBucket
+              - !Ref S3BucketName
           object:
             key:
-              - prefix: '04-california/aws_transcribe/ine/raw/'
+              - prefix: 'amazon_transcribe/ine/raw/'
               - suffix: '.ts'
       Targets:
         - Arn: !GetAtt TranscriptionStateMachine.Arn
@@ -512,13 +523,13 @@ Resources:
 Outputs:
   S3BucketName:
     Description: 'S3 Bucket for video storage'
-    Value: !Ref TranscriptionBucket
+    Value: !Ref S3BucketName
     Export:
       Name: !Sub '${AWS::StackName}-BucketName'
 
   UploadCommand:
     Description: 'AWS CLI command to upload .ts files'
-    Value: !Sub 'aws s3 sync /local/folder s3://${TranscriptionBucket}/04-california/aws_transcribe/ine/raw/ --exclude "*" --include "*.ts"'
+    Value: !Sub 'aws s3 sync /local/folder s3://${S3BucketName}/amazon_transcribe/ine/raw/ --exclude "*" --include "*.ts"'
 
   StateMachineArn:
     Description: 'Step Functions State Machine ARN'
@@ -541,6 +552,6 @@ Outputs:
   ConsoleLinks:
     Description: 'AWS Console quick links'
     Value: !Sub |
-      S3 Bucket: https://s3.console.aws.amazon.com/s3/buckets/${TranscriptionBucket}
+      S3 Bucket: https://s3.console.aws.amazon.com/s3/buckets/${S3BucketName}
       Step Functions: https://${AWS::Region}.console.aws.amazon.com/states/home?region=${AWS::Region}#/statemachines/view/${TranscriptionStateMachine}
       Lambda: https://${AWS::Region}.console.aws.amazon.com/lambda/home?region=${AWS::Region}#/functions/${TextProcessorLambda}

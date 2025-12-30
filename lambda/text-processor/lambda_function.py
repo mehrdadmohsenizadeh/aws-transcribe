@@ -24,15 +24,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     Expected Input:
     {
-        "bucket": "your-bucket-name",
-        "srtKey": "04-california/aws_transcribe/ine/transcripts/video01.srt",
+        "bucket": "04-california",
+        "srtKey": "amazon_transcribe/ine/transcripts/video01.srt",
         "baseFilename": "video01"
     }
 
     Returns:
     {
         "statusCode": 200,
-        "txtKey": "04-california/aws_transcribe/ine/text/video01.txt",
+        "txtKey": "amazon_transcribe/ine/text/video01.txt",
         "textLength": 15234
     }
     """
@@ -52,7 +52,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         clean_text = parse_srt_to_text(srt_content)
 
         # Upload clean text to S3
-        txt_key = f"04-california/aws_transcribe/ine/text/{base_filename}.txt"
+        txt_key = f"amazon_transcribe/ine/text/{base_filename}.txt"
         upload_text(bucket, txt_key, clean_text)
 
         logger.info(f"Successfully created clean text: s3://{bucket}/{txt_key}")

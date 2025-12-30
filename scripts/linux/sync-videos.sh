@@ -11,8 +11,8 @@ set -euo pipefail
 # CONFIGURATION
 # ============================================================================
 LOCAL_FOLDER="${LOCAL_VIDEO_FOLDER:-/path/to/your/videos}"
-S3_BUCKET="${S3_BUCKET_NAME:-your-bucket-name}"
-S3_PREFIX="04-california/aws_transcribe/ine/raw/"
+S3_BUCKET="${S3_BUCKET_NAME:-04-california}"
+S3_PREFIX="amazon_transcribe/ine/raw/"
 AWS_PROFILE="${AWS_PROFILE:-default}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 
