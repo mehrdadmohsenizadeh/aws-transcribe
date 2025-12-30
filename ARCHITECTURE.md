@@ -29,7 +29,7 @@ Local Machine (Win/Linux)
     │ (AWS CLI sync / DataSync)
     ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ S3 Bucket: s3://your-bucket/04-california/aws_transcribe/ine/  │
+│ S3 Bucket: s3://04-california/04-california/amazon_transcribe/ine/  │
 │                                                                  │
 │   ├── raw/          (.ts files)                                 │
 │   ├── transcoded/   (.mp4 files)                                │

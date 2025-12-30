@@ -46,7 +46,7 @@ git clone https://github.com/your-org/aws-transcribe.git
 cd aws-transcribe
 
 # 3. Deploy infrastructure
-export S3_BUCKET_NAME="your-unique-bucket-name-12345"
+export S3_BUCKET_NAME="04-california"
 export NOTIFICATION_EMAIL="your-email@example.com"
 
 aws cloudformation create-stack \
@@ -72,7 +72,7 @@ aws lambda update-function-code \
   --region us-east-1
 
 # 5. Test with a video
-aws s3 cp your-video.ts s3://$S3_BUCKET_NAME/04-california/aws_transcribe/ine/raw/
+aws s3 cp your-video.ts s3://$S3_BUCKET_NAME/04-california/amazon_transcribe/ine/raw/
 ```
 
 **That's it!** Monitor progress in the [Step Functions Console](https://console.aws.amazon.com/states).
@@ -123,7 +123,7 @@ aws-transcribe/
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  S3 Bucket: s3://your-bucket/04-california/aws_transcribe/  │
+│  S3 Bucket: s3://04-california/04-california/amazon_transcribe/  │
 │                                                              │
 │  ├── raw/          (.ts files)                              │
 │  ├── transcoded/   (.mp4 files)                             │
@@ -183,7 +183,7 @@ aws-transcribe/
 **Linux/Mac:**
 ```bash
 export LOCAL_VIDEO_FOLDER="/path/to/videos"
-export S3_BUCKET_NAME="your-bucket-name"
+export S3_BUCKET_NAME="04-california"
 
 # Continuous sync every 60 seconds
 ./scripts/linux/sync-videos.sh
@@ -195,7 +195,7 @@ export S3_BUCKET_NAME="your-bucket-name"
 **Windows (PowerShell):**
 ```powershell
 $env:LOCAL_VIDEO_FOLDER = "C:\Videos"
-$env:S3_BUCKET_NAME = "your-bucket-name"
+$env:S3_BUCKET_NAME = "04-california"
 
 # Continuous sync every 60 seconds
 .\scripts\windows\sync-videos.ps1
@@ -207,14 +207,14 @@ $env:S3_BUCKET_NAME = "your-bucket-name"
 ### Manual Upload
 
 ```bash
-aws s3 cp video.ts s3://your-bucket/04-california/aws_transcribe/ine/raw/
+aws s3 cp video.ts s3://04-california/04-california/amazon_transcribe/ine/raw/
 ```
 
 ### Download Results
 
 ```bash
 # Download all processed text files
-aws s3 sync s3://your-bucket/04-california/aws_transcribe/ine/text/ ./study-materials/
+aws s3 sync s3://04-california/04-california/amazon_transcribe/ine/text/ ./study-materials/
 ```
 
 ---
@@ -273,7 +273,7 @@ VLAN
 EOF
 
 # Upload to S3
-aws s3 cp ccna-vocabulary.txt s3://your-bucket/vocabulary/
+aws s3 cp ccna-vocabulary.txt s3://04-california/vocabulary/
 
 # Update Step Functions to reference it
 # (See docs/DEPLOYMENT.md#advanced-configuration)

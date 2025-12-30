@@ -22,8 +22,8 @@ param(
 
 $Script:Config = @{
     LocalFolder = $env:LOCAL_VIDEO_FOLDER ?? "C:\Videos"
-    S3Bucket = $env:S3_BUCKET_NAME ?? "your-bucket-name"
-    S3Prefix = "04-california/aws_transcribe/ine/raw/"
+    S3Bucket = $env:S3_BUCKET_NAME ?? "04-california"
+    S3Prefix = "04-california/amazon_transcribe/ine/raw/"
     AWSProfile = $env:AWS_PROFILE ?? "default"
     AWSRegion = $env:AWS_REGION ?? "us-east-1"
     SyncInterval = $Interval
