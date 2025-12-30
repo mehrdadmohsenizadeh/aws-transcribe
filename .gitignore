@@ -1,0 +1,69 @@
+# AWS Transcription Pipeline - Git Ignore
+
+# Lambda deployment packages
+lambda/**/*.zip
+lambda/**/package/
+*.pyc
+__pycache__/
+
+# Python virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# AWS credentials and config
+.aws/
+*.pem
+*.key
+credentials
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# CloudFormation/Terraform state
+*.tfstate
+*.tfstate.backup
+.terraform/
+cloudformation-output.json
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Test files
+test-videos/
+*.ts
+*.mp4
+*.srt
+*.vtt
+*.txt
+!lambda/**/*.py  # Keep Python source files
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
