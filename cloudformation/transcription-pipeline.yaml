@@ -224,7 +224,14 @@ Resources:
                   - 'lambda:InvokeFunction'
                 Resource: !GetAtt TextProcessorLambda.Arn
 
-              # S3 permissions (for Transcribe output)
+              # S3 permissions (for Transcribe input and output)
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3BucketName}'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/*'
               - Effect: Allow
                 Action:
                   - 's3:PutObject'
