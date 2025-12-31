@@ -237,6 +237,16 @@ Resources:
                   - 'sns:Publish'
                 Resource: !Ref PipelineNotificationTopic
 
+              # EventBridge permissions (for MediaConvert .sync integration)
+              - Effect: Allow
+                Action:
+                  - 'events:PutTargets'
+                  - 'events:PutRule'
+                  - 'events:DescribeRule'
+                  - 'events:DeleteRule'
+                  - 'events:RemoveTargets'
+                Resource: '*'
+
               # X-Ray (optional, for tracing)
               - Effect: Allow
                 Action:
